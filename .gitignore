@@ -1,0 +1,6 @@
+venv/
+.env
+output/*.png
+__pycache__/
+*.pyc
+genre_cache.json
