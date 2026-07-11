@@ -2,7 +2,6 @@
 
 A "Spotify Wrapped" style recap card generator for your Steam library — total hours played, top games, backlog size, rarest achievement, and a fun badge based on your play patterns. Built with the Steam Web API and Pillow.
 
-![Sample Steam Wrapped card](output/wrapped_card.png)
 
 ## Features
 
