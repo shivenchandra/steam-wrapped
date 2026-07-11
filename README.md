@@ -1,66 +1,52 @@
 # Steam Wrapped
 
-A "Spotify Wrapped" style recap card generator for your Steam library — total hours played, top games, backlog size, rarest achievement, and a fun badge based on your play patterns. Built with the Steam Web API and Pillow.
-
+A beautiful, Next.js-powered web app and Python backend that generates a "Spotify Wrapped" style summary for your Steam profile.
 
 ## Features
-
-- Total hours played across your whole library
-- Top 5 most-played games with a bar chart
-- Backlog tracker — games you own but barely touched
-- Longest single-game commitment
-- Rarest achievement unlocked (compared against global unlock %)
-- Genre breakdown (cached locally to respect Steam's rate limits)
-- A rule-based "badge" summarizing your play style (e.g. *The Backlog Builder*, *The One-Game Wonder*)
+- **Total Playtime:** Discover your all-time total hours played.
+- **Top 5 Games:** Generates a visually stunning breakdown of your most played games.
+- **Backlog Tracker:** Find out how many games you own but have never touched.
+- **Generates Cards:** Creates downloadable images with a highly premium glassmorphism theme, ready to share on social media.
+- **Vanity URL Support:** Enter your Steam ID or custom community URL directly.
 
 ## Setup
 
-1. Clone this repo and create a virtual environment:
+1. **Install Python Backend Dependencies**
    ```bash
-   git clone https://github.com/yourusername/steam-wrapped.git
-   cd steam-wrapped
    python -m venv venv
    source venv/bin/activate   # Windows: venv\Scripts\activate
    pip install -r requirements.txt
    ```
 
-2. Get a free Steam Web API key: https://steamcommunity.com/dev/apikey
-
-3. Find your SteamID64 (use https://steamid.io/ if you only know your custom URL)
-
-4. Make sure your Steam profile's **Game details** privacy setting is Public (Steam > Settings > Privacy Settings), or the API will return nothing
-
-5. Copy `.env.example` to `.env` and fill in your values:
+2. **Configure API Keys**
+   Create a `.env` file in the root directory and add your Steam Web API Key:
    ```
    STEAM_API_KEY=your_key_here
-   STEAM_ID=your_steamid64_here
+   ```
+   You can get a free key at [https://steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey).
+
+3. **Install Frontend Dependencies**
+   ```bash
+   npm install
    ```
 
 ## Usage
 
+Start both the backend and frontend at the same time:
+
+**Terminal 1 (Backend):**
 ```bash
-python main.py
+venv\Scripts\python api\index.py
 ```
 
-Your card will be saved to `output/wrapped_card.png`.
-
-## Project structure
-
-```
-steam-wrapped/
-├── steam_api.py       # All Steam Web API calls
-├── stats.py           # Turns raw API data into "Wrapped" stats
-├── card_generator.py  # Renders the final PNG card with Pillow
-├── main.py            # Entry point - wires everything together
-├── fonts/             # Drop custom .ttf fonts here (optional)
-└── output/            # Generated cards land here
+**Terminal 2 (Frontend):**
+```bash
+npm run dev
 ```
 
-## How it works
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-- `GetOwnedGames` pulls your full library with playtime
-- `GetPlayerSummaries` pulls your display name and avatar
-- `GetPlayerAchievements` + `GetGlobalAchievementPercentagesForApp` find your rarest unlocked achievement
-- Genre tags come from Steam's store API, cached locally in `genre_cache.json` to avoid hitting rate limits on repeated runs
+## Deploy on Vercel
 
-**Note:** Steam's API only exposes *all-time* playtime, not "this year's" playtime, unless you've been snapshotting your own data over time. So this is technically an "All-Time Wrapped" rather than a strict calendar-year one.
+The app is configured to deploy seamlessly on Vercel. Simply push to GitHub, connect your repository to Vercel, and add the `STEAM_API_KEY` to your Vercel Environment Variables. The Next.js config will automatically proxy requests to the Python serverless functions.
+

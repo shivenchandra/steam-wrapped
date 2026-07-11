@@ -3,6 +3,7 @@ card_generator.py
 Renders a Playcope-inspired Steam Wrapped poster card as a PNG using Pillow.
 """
 
+import base64
 import os
 from io import BytesIO
 
@@ -17,8 +18,8 @@ BLACK = "#262626"
 INK = "#f3f2ec"
 PAPER = "#ebe9df"
 MUTED = "#d3d1c8"
-YELLOW = "#f2c300"
-RED = "#ff4b32"
+YELLOW = "#00a8ff"
+RED = "#00e5ff"
 
 FONT_DIR = "fonts"
 FONT_BOLD_PATH = os.path.join(FONT_DIR, "bold.ttf")
@@ -283,137 +284,135 @@ def _draw_bg_stats(draw):
     )
 
 
+def _save_or_base64(img, output_path, return_base64=False):
+    img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=110, threshold=3))
+    if return_base64:
+        buffer = BytesIO()
+        img.save(buffer, format="PNG", quality=95)
+        return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode("utf-8")
+    if output_path:
+        img.save(output_path, quality=95)
+        return output_path
+    return None
+
 # ─── Card 1: Overview ───────────────────────────────────────────────
 
 
-def _generate_overview(profile, stats, output_path):
-    """Card 1: Most played game, player name, total hours."""
-    img = Image.new("RGB", (CARD_WIDTH, CARD_HEIGHT), BLACK)
-    draw = ImageDraw.Draw(img)
-    _draw_bg_overview(draw)
-
-    font_label = _load_font(FONT_BOLD_PATH, 30, "heavy")
-    font_hours = _load_font(FONT_BOLD_PATH, 110, "heavy")
-    font_hrs = _load_font(FONT_BOLD_PATH, 48, "heavy")
-    font_badge = _load_font(FONT_BOLD_PATH, 30, "heavy")
-    font_stat_num = _load_font(FONT_BOLD_PATH, 56, "heavy")
-    font_stat_lbl = _load_font(FONT_REGULAR_PATH, 22, "regular")
-    font_small = _load_font(FONT_REGULAR_PATH, 18, "regular")
-
+def _generate_overview(profile, stats, output_path=None, return_base64=False):
+    """Card 1: Premium Glassmorphism Design with blurred game background."""
     top_games = stats.get("top_games", [])
     hero = top_games[0] if top_games else {}
+    
+    font_label = _load_font(FONT_BOLD_PATH, 34, "heavy")
+    font_hours = _load_font(FONT_BOLD_PATH, 160, "heavy") 
+    font_hrs = _load_font(FONT_BOLD_PATH, 60, "heavy")
+    font_badge = _load_font(FONT_BOLD_PATH, 36, "heavy")
+    font_stat_num = _load_font(FONT_BOLD_PATH, 64, "heavy")
+    font_stat_lbl = _load_font(FONT_REGULAR_PATH, 26, "regular")
+    font_small = _load_font(FONT_REGULAR_PATH, 20, "regular")
+    font_header = _load_font(FONT_BOLD_PATH, 24, "heavy")
 
-    # ── Hero game art (bigger) ──
-    art = _steam_art(hero.get("appid"), (560, 350), centering=(0.5, 0.42))
-    hero_box = [60, 80, 620, 430]
-    _poster_frame(draw, [55, 75, 625, 435], fill=INK, outline=INK, width=1)
+    # ── 1. Base image (blurred hero art) ──
+    hero_bg = _steam_art(hero.get("appid"), (CARD_WIDTH, CARD_HEIGHT), centering=(0.5, 0.5))
+    if hero_bg:
+        hero_bg = hero_bg.filter(ImageFilter.GaussianBlur(radius=25))
+        img = hero_bg
+        # Dark overlay
+        overlay = Image.new("RGBA", (CARD_WIDTH, CARD_HEIGHT), (20, 20, 20, 220)) 
+        img = img.convert("RGBA")
+        img.alpha_composite(overlay)
+        img = img.convert("RGB")
+    else:
+        img = Image.new("RGB", (CARD_WIDTH, CARD_HEIGHT), BLACK)
+
+    draw = ImageDraw.Draw(img, "RGBA")
+    
+    # Glowing accents in the background
+    draw.ellipse([-200, -200, 400, 400], fill=(0, 168, 255, 30))
+    draw.ellipse([700, 900, 1300, 1500], fill=(0, 229, 255, 20))
+
+    # ── Top Bar: Avatar and Name ──
+    avatar = _fetch_avatar(profile.get("avatarfull", ""), size=100)
+    draw.ellipse([60, 60, 160, 160], outline=YELLOW, width=4)
+    if avatar:
+        img.paste(avatar, (60, 60), avatar)
+        
+    player = _clean(profile.get("personaname", "Player"))
+    draw.text((190, 105), player, font=font_label, fill=INK)
+
+    # ── Hero Game Art (Large, Centered) ──
+    art = _steam_art(hero.get("appid"), (860, 450), centering=(0.5, 0.42))
+    hero_box = [110, 220, 970, 670]
+    
+    # Draw soft shadow & frame
+    draw.rectangle([120, 230, 980, 680], fill=(0, 0, 0, 150))
+    draw.rectangle([105, 215, 975, 675], fill=INK, outline=YELLOW, width=3)
     if art:
         img.paste(art, (hero_box[0], hero_box[1]))
     else:
         _game_art_tile(img, hero_box, hero, font_small)
 
-    # ── Avatar ──
-    avatar = _fetch_avatar(profile.get("avatarfull", ""), size=210)
-    draw.ellipse([738, 80, 968, 310], outline=INK, width=5)
-    if avatar:
-        img.paste(avatar, (748, 90), avatar)
-
-    # ── Player name box ──
-    player = _clean(profile.get("personaname", "Player"))
-    player_box = [640, 360, 1030, 480]
-    draw.rectangle(player_box, fill=BLACK, outline=INK, width=4)
-    fitted_player = _fit_font(
-        draw, player, player_box[2] - player_box[0] - 40, 54, 32,
-    )
-    _draw_centered(
-        draw, player_box, player, fitted_player, fill=INK, stroke=2,
-    )
-    # Wavy underline
-    draw.line(
-        [(640, 500), (790, 480), (930, 510), (1030, 484)],
-        fill=INK, width=4,
-    )
-    draw.line(
-        [(640, 510), (790, 490), (930, 520), (1030, 494)],
-        fill=INK, width=2,
-    )
-
-    # ── Most Played Game ──
+    # ── Most Played Game Title ──
+    title = _clean(hero.get("name", "Top Game"))
+    fitted_title = _fit_font(draw, title, 860, 72, 40)
     draw.text(
-        (70, 470), "Most Played Game", font=font_label,
+        (110, 720), title, font=fitted_title,
         fill=INK, stroke_width=2, stroke_fill="#111111",
     )
-    title = _clean(hero.get("name", "Top Game"))
-    fitted_title = _fit_font(draw, title, 540, 72, 40)
     draw.text(
-        (70, 530), title, font=fitted_title,
-        fill=INK, stroke_width=3, stroke_fill="#111111",
+        (110, 695), "MOST PLAYED GAME", font=font_small, fill=YELLOW
     )
 
     # ── Total Hours (large & dramatic) ──
-    draw.text(
-        (70, 680), "Total Hours", font=font_label,
-        fill=INK, stroke_width=2, stroke_fill="#111111",
-    )
     hours_text = f"{stats.get('total_hours', 0):,.0f}"
     draw.text(
-        (70, 740), hours_text, font=font_hours,
-        fill=INK, stroke_width=3, stroke_fill="#111111",
-    )
-    hrs_x = 70 + _text_size(draw, hours_text, font_hours)[0] + 18
-    draw.text(
-        (hrs_x, 790), "hrs", font=font_hrs,
+        (110, 860), hours_text, font=font_hours,
         fill=INK, stroke_width=2, stroke_fill="#111111",
+    )
+    hrs_x = 110 + _text_size(draw, hours_text, font_hours)[0] + 18
+    draw.text(
+        (hrs_x, 950), "hrs", font=font_hrs,
+        fill=YELLOW, stroke_width=1, stroke_fill="#111111",
+    )
+    draw.text(
+        (110, 835), "TOTAL PLAYTIME", font=font_small, fill=MUTED
     )
 
     # ── Mini stat boxes ──
     game_count = str(stats.get("game_count", 0))
     backlog_count = str(len(stats.get("backlog", [])))
 
-    # Game count
-    draw.text(
-        (70, 940), game_count, font=font_stat_num,
-        fill=INK, stroke_width=3, stroke_fill="#111111",
-    )
+    draw.text((110, 1080), game_count, font=font_stat_num, fill=INK)
     gc_w = _text_size(draw, game_count, font_stat_num)[0]
-    draw.text(
-        (70, 1000), "Games Owned", font=font_stat_lbl,
-        fill=MUTED, stroke_width=1, stroke_fill="#111111",
-    )
+    lbl_w = _text_size(draw, "Games", font=font_stat_lbl)[0]
+    draw.text((110, 1150), "Games\nOwned", font=font_stat_lbl, fill=MUTED)
 
-    # Separator dot
-    sep_x = 70 + gc_w + 80
-    draw.ellipse([sep_x, 960, sep_x + 8, 968], fill=MUTED)
+    sep_x = max(110 + gc_w + 60, 110 + lbl_w + 40)
+    draw.rectangle([sep_x, 1090, sep_x + 4, 1180], fill=RED)
 
-    # Backlog count
-    draw.text(
-        (sep_x + 40, 940), backlog_count, font=font_stat_num,
-        fill=INK, stroke_width=3, stroke_fill="#111111",
-    )
-    draw.text(
-        (sep_x + 40, 1000), "Untouched", font=font_stat_lbl,
-        fill=MUTED, stroke_width=1, stroke_fill="#111111",
-    )
+    draw.text((sep_x + 60, 1080), backlog_count, font=font_stat_num, fill=INK)
+    draw.text((sep_x + 60, 1150), "Untouched", font=font_stat_lbl, fill=MUTED)
 
     # ── Badge ──
-    badge = _clean(stats.get("badge", "Steam Gamer")).replace("The ", "")
-    _label(draw, [70, 1080, 480, 1132], badge, font_badge)
+    badge = _clean(stats.get("badge", "Steam Gamer")).replace("The ", "").upper()
+    badge_w = _text_size(draw, badge, font_badge)[0] + 40
+    badge_box = [CARD_WIDTH - 60 - badge_w, 1080, CARD_WIDTH - 60, 1160]
+    draw.rectangle(badge_box, fill=YELLOW, outline=INK, width=2)
+    _draw_centered(draw, badge_box, badge, font_badge, fill=BLACK)
 
     # ── Footer ──
     draw.text(
-        (42, 1316), "STEAM-WRAPPED", font=font_small,
-        fill=INK, stroke_width=1, stroke_fill="#111111",
+        (CARD_WIDTH - 240, CARD_HEIGHT - 50), "CREATED BY SHIVEN", font=font_small,
+        fill=INK,
     )
 
-    img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=110, threshold=3))
-    img.save(output_path, quality=95)
-    return output_path
+    return _save_or_base64(img, output_path, return_base64)
 
 
 # ─── Card 2: Top Games ──────────────────────────────────────────────
 
 
-def _generate_games(stats, output_path):
+def _generate_games(stats, output_path=None, return_base64=False):
     """Card 2: Top 5 most-played games list."""
     img = Image.new("RGB", (CARD_WIDTH, CARD_HEIGHT), BLACK)
     draw = ImageDraw.Draw(img)
@@ -426,7 +425,7 @@ def _generate_games(stats, output_path):
     font_small = _load_font(FONT_REGULAR_PATH, 18, "regular")
 
     # Header
-    _label(draw, [340, 50, 740, 106], "Our Top Games", font_label)
+    _label(draw, [340, 50, 740, 106], "Your Top Games", font_label)
 
     top_games = stats.get("top_games", [])
     row_h = 190
@@ -466,16 +465,13 @@ def _generate_games(stats, output_path):
         (42, 1316), "STEAM-WRAPPED", font=font_small,
         fill=INK, stroke_width=1, stroke_fill="#111111",
     )
-
-    img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=110, threshold=3))
-    img.save(output_path, quality=95)
-    return output_path
+    return _save_or_base64(img, output_path, return_base64)
 
 
 # ─── Card 3: Stats & Achievement ────────────────────────────────────
 
 
-def _generate_stats(stats, output_path):
+def _generate_stats(stats, output_path=None, return_base64=False):
     """Card 3: Steam stats summary and rarest achievement."""
     img = Image.new("RGB", (CARD_WIDTH, CARD_HEIGHT), BLACK)
     draw = ImageDraw.Draw(img)
@@ -540,26 +536,25 @@ def _generate_stats(stats, output_path):
         fill=INK, stroke_width=1, stroke_fill="#111111",
     )
 
-    img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=110, threshold=3))
-    img.save(output_path, quality=95)
-    return output_path
+    return _save_or_base64(img, output_path, return_base64)
 
 
 # ─── Public API ──────────────────────────────────────────────────────
 
 
-def generate_card(profile, stats, output_dir="output"):
-    """Generate all three Steam Wrapped cards. Returns list of paths."""
-    os.makedirs(output_dir, exist_ok=True)
+def generate_card(profile, stats, output_dir="output", return_base64=False):
+    """Generate all three Steam Wrapped cards. Returns list of paths or base64 strings."""
+    if not return_base64:
+        os.makedirs(output_dir, exist_ok=True)
     paths = [
         _generate_overview(
-            profile, stats, os.path.join(output_dir, "card_overview.png"),
+            profile, stats, os.path.join(output_dir, "card_overview.png") if not return_base64 else None, return_base64
         ),
         _generate_games(
-            stats, os.path.join(output_dir, "card_top_games.png"),
+            stats, os.path.join(output_dir, "card_top_games.png") if not return_base64 else None, return_base64
         ),
         _generate_stats(
-            stats, os.path.join(output_dir, "card_stats.png"),
+            stats, os.path.join(output_dir, "card_stats.png") if not return_base64 else None, return_base64
         ),
     ]
     return paths

@@ -30,16 +30,19 @@ def _check_config():
         )
 
 
-def get_owned_games():
+def get_owned_games(steam_id=None):
     """
     Fetch the full list of owned games with playtime.
     Returns a list of dicts: [{appid, name, playtime_forever, playtime_2weeks}, ...]
     """
-    _check_config()
+    sid = steam_id or STEAM_ID
+    if not API_KEY or not sid:
+        raise SteamAPIError("Missing STEAM_API_KEY or steam_id")
+
     url = f"{BASE_URL}/IPlayerService/GetOwnedGames/v0001/"
     params = {
         "key": API_KEY,
-        "steamid": STEAM_ID,
+        "steamid": sid,
         "format": "json",
         "include_appinfo": True,
         "include_played_free_games": True,
@@ -59,14 +62,45 @@ def get_owned_games():
     return response_block["games"]
 
 
-def get_player_summary():
+def resolve_vanity_url(vanity_url):
+    """
+    Resolve a Steam vanity URL name to a 64-bit Steam ID.
+    Returns the Steam ID string, or None if it fails.
+    """
+    url = f"{BASE_URL}/ISteamUser/ResolveVanityURL/v0001/"
+    params = {"key": API_KEY, "vanityurl": vanity_url}
+    try:
+        resp = requests.get(url, params=params, timeout=10)
+        data = resp.json()
+        if data.get("response", {}).get("success") == 1:
+            return data["response"]["steamid"]
+    except Exception:
+        pass
+    return None
+
+def get_player_summary(steam_id=None):
     """
     Fetch basic profile info: display name, avatar URL, profile URL.
-    Returns a dict: {personaname, avatarfull, profileurl}
+    Returns a dict: {steamid, personaname, avatarfull, profileurl}
     """
-    _check_config()
+    sid = steam_id or STEAM_ID
+    if not API_KEY or not sid:
+        raise SteamAPIError("Missing STEAM_API_KEY or steam_id")
+
+    # If the user pasted a full URL, extract the last path segment
+    if "/" in sid:
+        sid = [p for p in sid.split("/") if p][-1]
+
+    # If it's not a 17-digit number, assume it's a vanity URL
+    if not (sid.isdigit() and len(sid) == 17):
+        resolved = resolve_vanity_url(sid)
+        if resolved:
+            sid = resolved
+        else:
+            raise SteamAPIError(f"Could not resolve vanity URL '{sid}' to a Steam ID.")
+
     url = f"{BASE_URL}/ISteamUser/GetPlayerSummaries/v0002/"
-    params = {"key": API_KEY, "steamids": STEAM_ID}
+    params = {"key": API_KEY, "steamids": sid}
     resp = requests.get(url, params=params, timeout=15)
     resp.raise_for_status()
     data = resp.json()
@@ -77,21 +111,25 @@ def get_player_summary():
 
     p = players[0]
     return {
+        "steamid": p.get("steamid", sid),
         "personaname": p.get("personaname", "Unknown Player"),
         "avatarfull": p.get("avatarfull", ""),
         "profileurl": p.get("profileurl", ""),
     }
 
 
-def get_player_achievements(appid):
+def get_player_achievements(appid, steam_id=None):
     """
     Fetch the player's unlocked achievements for a single game.
     Returns a list of dicts: [{apiname, achieved, name, description}, ...]
     Returns [] if the game has no achievements or stats are private.
     """
-    _check_config()
+    sid = steam_id or STEAM_ID
+    if not API_KEY or not sid:
+        return []
+
     url = f"{BASE_URL}/ISteamUserStats/GetPlayerAchievements/v0001/"
-    params = {"key": API_KEY, "steamid": STEAM_ID, "appid": appid}
+    params = {"key": API_KEY, "steamid": sid, "appid": appid}
     try:
         resp = requests.get(url, params=params, timeout=10)
         if resp.status_code != 200:

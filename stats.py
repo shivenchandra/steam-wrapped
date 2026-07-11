@@ -124,7 +124,7 @@ def get_genre_breakdown(games, max_games_to_check=60, sleep_between_calls=0.3):
     return dict(sorted(genre_hours.items(), key=lambda x: x[1], reverse=True))
 
 
-def find_rarest_achievement(games, max_games_to_check=10):
+def find_rarest_achievement(games, steam_id=None, max_games_to_check=10):
     """
     Looks through your top-played games for the achievement you've
     unlocked with the lowest global completion percentage - your
@@ -137,7 +137,7 @@ def find_rarest_achievement(games, max_games_to_check=10):
 
     for g in candidates:
         appid = g["appid"]
-        my_achievements = get_player_achievements(appid)
+        my_achievements = get_player_achievements(appid, steam_id=steam_id)
         unlocked = [a["apiname"] for a in my_achievements if a.get("achieved") == 1]
         if not unlocked:
             continue
@@ -187,7 +187,7 @@ def get_badge(computed_stats):
     return "The Balanced Gamer"
 
 
-def compute_all_stats(games, include_genres=True, include_achievements=True):
+def compute_all_stats(games, steam_id=None, include_genres=True, include_achievements=True):
     """
     Convenience function that runs everything and returns one dict
     ready to hand to the card generator.
@@ -205,7 +205,7 @@ def compute_all_stats(games, include_genres=True, include_achievements=True):
         stats["genres"] = get_genre_breakdown(games)
 
     if include_achievements:
-        stats["rarest_achievement"] = find_rarest_achievement(games)
+        stats["rarest_achievement"] = find_rarest_achievement(games, steam_id=steam_id)
 
     stats["badge"] = get_badge(stats)
     return stats
